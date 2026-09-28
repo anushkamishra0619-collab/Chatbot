@@ -52,6 +52,8 @@ function App() {
     } finally {
       setLoading(false);
     }
+    let dataString=response.candidates[0].content.parts[0].text;
+    dataString=dataString.split("*")
   };
 
   const handleKeyDown = (e) => {
