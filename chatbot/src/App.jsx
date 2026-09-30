@@ -1,89 +1,26 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { useDispatch, useSelector } from 'react-redux'
 import ReactMarkdown from 'react-markdown'
 import './App.css'
-import { URL,API_KEY } from './constants';
 import RecentQuestions from './components/RecentQuestions'
+import { askQuestion } from './features/chat/chatSlice'
 
 function App() {
   const [question, setQuestion] = useState("");
-  const [answer, setAnswer] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [recentHistory, setRecentHistory] = useState(() => {
-    const savedHistory = localStorage.getItem("history");
-    if (!savedHistory) return [];
+  const dispatch = useDispatch();
+  const { answer, loading, recentHistory } = useSelector((state) => state.chat);
 
-    try {
-      const parsedHistory = JSON.parse(savedHistory);
-      if (Array.isArray(parsedHistory)) return parsedHistory;
-      return typeof parsedHistory === "string" ? [parsedHistory] : [];
-    } catch {
-      return [];
-    }
-  });
+  useEffect(() => {
+    localStorage.setItem("history", JSON.stringify(recentHistory));
+  }, [recentHistory]);
 
-  const askQuestion = async () => {
+  const submitQuestion = () => {
     if (!question.trim() || loading) return;
-
-    const updatedHistory = [question, ...recentHistory];
-    setRecentHistory(updatedHistory);
-    localStorage.setItem("history", JSON.stringify(updatedHistory));
-
-    if (!API_KEY) {
-      setAnswer("Missing API key — check your .env file and restart the dev server.");
-      return;
-    }
-
-    const payload = {
-      contents: [
-        { parts: [{ text: question }] }
-      ]
-    };
-
-    setLoading(true);
-    setAnswer("");
-
-    try {
-      const res = await fetch(URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
-      });
-
-      const data = await res.json().catch(() => null);
-
-      if (!res.ok) {
-        const errorMessage = data?.error?.message || "The API returned an unexpected error.";
-        console.error("API error:", res.status, data);
-        setAnswer(`Error ${res.status}: ${errorMessage}`);
-        return;
-      }
-
-      const candidate = data?.candidates?.[0];
-      const text = candidate?.content?.parts
-        ?.map((part) => part.text)
-        .filter(Boolean)
-        .join("\n");
-
-      if (text) {
-        setAnswer(text);
-      } else {
-        const reason = data?.promptFeedback?.blockReason || candidate?.finishReason;
-        setAnswer(
-          reason
-            ? `The API couldn't answer this question (${reason}). Try rephrasing it.`
-            : "The API returned no answer. Please try again."
-        );
-      }
-    } catch (error) {
-      console.error("Error fetching data:", error);
-      setAnswer("Network error — check your connection.");
-    } finally {
-      setLoading(false);
-    }
+    dispatch(askQuestion(question));
   };
 
   const handleKeyDown = (e) => {
-    if (e.key === "Enter") askQuestion();
+    if (e.key === "Enter") submitQuestion();
   };
 
   return (
@@ -103,7 +40,7 @@ function App() {
             placeholder="Ask me anything"
             disabled={loading}
           />
-          <button className='p-3' onClick={askQuestion} disabled={loading}>
+          <button className='p-3' onClick={submitQuestion} disabled={loading}>
             {loading ? "..." : "Ask"}
           </button>
         </div>
